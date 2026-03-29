@@ -2,6 +2,8 @@
 
 **Disclamer**: This whole project is vibe coded with claude code  and in that also antigravity's proxy is used, so use it accordingly (I don't know much about `js` so don't know what is written in this), it could have vulnerabilities. If you find any vulnerabilities in this you can contribute in this project and improve it. 
 
+This is project is inspired from the another project just like this, this is the project link: https://github.com/badrisnarayanan/antigravity-claude-proxy
+
 A proxy server that lets you use Claude models in **Claude Code CLI** by routing requests through **Amazon Q Developer's** infrastructure.
 
 It exposes an Anthropic-compatible Messages API (`/v1/messages`) and translates requests to Amazon Q's CodeWhisperer chat API behind the scenes.
