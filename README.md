@@ -55,7 +55,7 @@ An AWS Builder ID is a free personal account — it is **not** an AWS account an
 
 ```bash
 # 1. Clone and install
-git clone <repo-url>
+git clone https://github.com/JayPatel4739/amazonq-claude-code-proxy
 cd amazonq-claude-proxy
 npm install
 
