@@ -1,0 +1,26 @@
+{
+  "name": "amazonq-claude-proxy",
+  "version": "1.0.0",
+  "description": "Proxy server to use Claude models via Amazon Q Developer in Claude Code CLI",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "accounts": "node src/cli/accounts.js"
+  },
+  "keywords": [
+    "claude",
+    "amazonq",
+    "proxy",
+    "anthropic"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  }
+}
