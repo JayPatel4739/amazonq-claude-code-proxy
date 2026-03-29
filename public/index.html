@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amazon Q Claude Proxy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        space: {
+                            800: '#1e2030',
+                            850: '#191b2a',
+                            900: '#13141f',
+                            950: '#0d0e17'
+                        },
+                        neon: {
+                            cyan: '#00d4ff',
+                            green: '#00ff88',
+                            purple: '#a855f7',
+                            orange: '#ff8c00'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        body { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+        .sidebar-link { transition: all 0.15s ease; }
+        .sidebar-link:hover, .sidebar-link.active { background: rgba(0, 212, 255, 0.1); color: #00d4ff; }
+        .card { background: #1e2030; border: 1px solid rgba(255,255,255,0.06); border-radius: 0.75rem; }
+        .stat-value { font-size: 1.75rem; font-weight: 700; }
+        .badge-ok { background: rgba(0, 255, 136, 0.15); color: #00ff88; }
+        .badge-warn { background: rgba(255, 140, 0, 0.15); color: #ff8c00; }
+        .badge-error { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+        .btn-primary { background: linear-gradient(135deg, #00d4ff 0%, #a855f7 100%); color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-danger { background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.4rem 0.8rem; border-radius: 0.5rem; cursor: pointer; }
+        .btn-danger:hover { background: rgba(239, 68, 68, 0.3); }
+        .toggle { position: relative; width: 2.5rem; height: 1.25rem; background: #374151; border-radius: 9999px; cursor: pointer; transition: background 0.2s; }
+        .toggle.on { background: #00ff88; }
+        .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 1rem; height: 1rem; background: white; border-radius: 9999px; transition: transform 0.2s; }
+        .toggle.on::after { transform: translateX(1.25rem); }
+        .toast { position: fixed; top: 1rem; right: 1rem; z-index: 100; padding: 0.75rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .pulse-dot { width: 6px; height: 6px; background: #00ff88; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; padding: 0.5rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        td { padding: 0.6rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 0.8rem; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50; display: flex; align-items: center; justify-content: center; }
+        .modal { background: #1e2030; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.75rem; padding: 1.5rem; max-width: 28rem; width: 100%; }
+        input, select { background: #13141f; border: 1px solid rgba(255,255,255,0.1); color: #e5e7eb; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; width: 100%; }
+        input:focus, select:focus { outline: none; border-color: #00d4ff; }
+    </style>
+</head>
+<body class="bg-space-950 text-gray-300 min-h-screen overflow-hidden" x-cloak x-data="app()">
+
+    <!-- Toast -->
+    <template x-if="toast">
+        <div class="toast" :class="{
+            'bg-green-900/90 text-green-300 border border-green-700/50': toast.type === 'success',
+            'bg-red-900/90 text-red-300 border border-red-700/50': toast.type === 'error',
+            'bg-blue-900/90 text-blue-300 border border-blue-700/50': toast.type === 'info'
+        }" x-text="toast.message" x-init="setTimeout(() => toast = null, 3000)"></div>
+    </template>
+
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside class="w-56 bg-space-900 border-r border-white/5 flex flex-col">
+            <div class="p-4 border-b border-white/5">
+                <h1 class="text-sm font-bold text-white tracking-tight">Amazon Q Proxy</h1>
+                <div class="flex items-center gap-1.5 mt-1">
+                    <div class="pulse-dot"></div>
+                    <span class="text-[10px] text-gray-500 uppercase tracking-wider">Running</span>
+                </div>
+            </div>
+            <nav class="flex-1 p-2 space-y-0.5">
+                <button @click="view = 'dashboard'" class="sidebar-link w-full text-left px-3 py-2 rounded-lg text-sm" :class="view === 'dashboard' && 'active'">Dashboard</button>
+                <button @click="view = 'accounts'" class="sidebar-link w-full text-left px-3 py-2 rounded-lg text-sm" :class="view === 'accounts' && 'active'">Accounts</button>
+                <button @click="view = 'logs'" class="sidebar-link w-full text-left px-3 py-2 rounded-lg text-sm" :class="view === 'logs' && 'active'">Logs</button>
+                <button @click="view = 'models'" class="sidebar-link w-full text-left px-3 py-2 rounded-lg text-sm" :class="view === 'models' && 'active'">Models</button>
+                <button @click="view = 'settings'" class="sidebar-link w-full text-left px-3 py-2 rounded-lg text-sm" :class="view === 'settings' && 'active'">Settings</button>
+            </nav>
+            <div class="p-3 border-t border-white/5 text-[10px] text-gray-600">
+                v1.0.0
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto p-6">
+
+            <!-- Dashboard View -->
+            <div x-show="view === 'dashboard'" x-cloak>
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-white">Dashboard</h2>
+                    <div class="flex items-center gap-2 text-xs text-gray-500">
+                        <div class="pulse-dot"></div>
+                        <span>Live</span>
+                    </div>
+                </div>
+
+                <!-- Claude Config Warning -->
+                <template x-if="status && !status.claudeConfigured">
+                    <div class="card p-3 mb-4 border-orange-500/30 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-orange-400">!</span>
+                            <span class="text-sm text-orange-300">Claude Code not configured for this proxy</span>
+                        </div>
+                        <button @click="view = 'settings'" class="text-xs text-orange-400 hover:text-orange-300 underline">Configure</button>
+                    </div>
+                </template>
+
+                <!-- Stat Cards -->
+                <div class="grid grid-cols-4 gap-4 mb-6">
+                    <div class="card p-4">
+                        <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Uptime</div>
+                        <div class="stat-value text-white" x-text="status?.uptimeFormatted || '-'"></div>
+                    </div>
+                    <div class="card p-4">
+                        <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Total Requests</div>
+                        <div class="stat-value text-neon-cyan" x-text="status?.totalRequests || 0"></div>
+                    </div>
+                    <div class="card p-4">
+                        <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Active Accounts</div>
+                        <div class="stat-value text-neon-green" x-text="status?.accounts?.available || 0"></div>
+                    </div>
+                    <div class="card p-4">
+                        <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Rate Limited</div>
+                        <div class="stat-value" :class="(status?.accounts?.rateLimited || 0) > 0 ? 'text-orange-400' : 'text-gray-500'" x-text="status?.accounts?.rateLimited || 0"></div>
+                    </div>
+                </div>
+
+                <!-- Usage Chart -->
+                <div class="card p-4 mb-6">
+                    <h3 class="text-sm font-semibold text-gray-400 mb-3">Request History (24h)</h3>
+                    <canvas id="usageChart" height="120"></canvas>
+                </div>
+
+                <!-- Account Health Table -->
+                <div class="card p-4">
+                    <h3 class="text-sm font-semibold text-gray-400 mb-3">Account Health</h3>
+                    <template x-if="!status?.accounts?.accounts?.length">
+                        <p class="text-sm text-gray-600 py-4 text-center">No accounts configured. <button @click="view = 'accounts'" class="text-neon-cyan hover:underline">Add one</button></p>
+                    </template>
+                    <template x-if="status?.accounts?.accounts?.length">
+                        <table>
+                            <thead><tr><th>Account</th><th>Region</th><th>Status</th><th>Last Used</th></tr></thead>
+                            <tbody>
+                                <template x-for="acc in status.accounts.accounts" :key="acc.id">
+                                    <tr>
+                                        <td class="text-white" x-text="acc.label || 'Unnamed'"></td>
+                                        <td x-text="acc.region || 'us-east-1'"></td>
+                                        <td>
+                                            <span class="px-2 py-0.5 rounded-full text-xs"
+                                                :class="acc.isInvalid ? 'badge-error' : acc.enabled ? 'badge-ok' : 'badge-warn'"
+                                                x-text="acc.isInvalid ? 'Invalid' : acc.enabled ? 'Active' : 'Disabled'"></span>
+                                        </td>
+                                        <td class="text-gray-500 text-xs" x-text="acc.lastUsed ? new Date(acc.lastUsed).toLocaleString() : 'Never'"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Accounts View -->
+            <div x-show="view === 'accounts'" x-cloak>
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-white">Accounts</h2>
+                    <button @click="showAddModal = true" class="btn-primary text-sm">+ Add Account</button>
+                </div>
+
+                <template x-if="!accounts.length">
+                    <div class="card p-8 text-center">
+                        <p class="text-gray-500 mb-4">No accounts configured yet.</p>
+                        <button @click="showAddModal = true" class="btn-primary">Add Your First Account</button>
+                    </div>
+                </template>
+
+                <template x-if="accounts.length">
+                    <div class="card">
+                        <table>
+                            <thead><tr><th>Label</th><th>Region</th><th>Status</th><th>Enabled</th><th>Last Used</th><th>Actions</th></tr></thead>
+                            <tbody>
+                                <template x-for="acc in accounts" :key="acc.id">
+                                    <tr>
+                                        <td class="text-white" x-text="acc.label || 'Unnamed'"></td>
+                                        <td x-text="acc.region || 'us-east-1'"></td>
+                                        <td>
+                                            <span class="px-2 py-0.5 rounded-full text-xs"
+                                                :class="acc.isInvalid ? 'badge-error' : 'badge-ok'"
+                                                x-text="acc.isInvalid ? 'Invalid' : 'OK'"></span>
+                                        </td>
+                                        <td>
+                                            <div class="toggle" :class="acc.enabled && 'on'" @click="toggleAccount(acc)"></div>
+                                        </td>
+                                        <td class="text-gray-500 text-xs" x-text="acc.lastUsed ? new Date(acc.lastUsed).toLocaleString() : 'Never'"></td>
+                                        <td class="space-x-2">
+                                            <button @click="refreshAccount(acc.id)" class="text-xs text-neon-cyan hover:underline">Refresh</button>
+                                            <button @click="deleteAccount(acc.id)" class="text-xs text-red-400 hover:underline">Remove</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </template>
+
+                <!-- Add Account Modal -->
+                <template x-if="showAddModal">
+                    <div class="modal-overlay" @click.self="showAddModal = false">
+                        <div class="modal">
+                            <h3 class="text-lg font-bold text-white mb-4">Add Account</h3>
+
+                            <template x-if="!addFlow">
+                                <div>
+                                    <div class="mb-3">
+                                        <label class="block text-xs text-gray-500 mb-1">Start URL</label>
+                                        <input x-model="addStartUrl" placeholder="https://view.awsapps.com/start">
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="block text-xs text-gray-500 mb-1">Region</label>
+                                        <input x-model="addRegion" placeholder="us-east-1">
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button @click="startAddAccount()" class="btn-primary flex-1">Start Auth Flow</button>
+                                        <button @click="showAddModal = false" class="btn-danger">Cancel</button>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <template x-if="addFlow">
+                                <div class="text-center">
+                                    <p class="text-sm mb-3">Sign in using this code:</p>
+                                    <div class="text-3xl font-bold text-neon-cyan mb-3 tracking-widest" x-text="addFlow.userCode"></div>
+                                    <a :href="addFlow.verificationUriComplete" target="_blank" class="text-sm text-neon-purple hover:underline">Open Browser to Sign In</a>
+                                    <div class="mt-4 text-xs text-gray-500">
+                                        <div class="pulse-dot inline-block mr-1"></div>
+                                        Waiting for authentication...
+                                    </div>
+                                    <button @click="cancelAddFlow()" class="mt-4 text-xs text-gray-500 hover:text-gray-300">Cancel</button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Logs View -->
+            <div x-show="view === 'logs'" x-cloak>
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-white">Request Logs</h2>
+                    <div class="flex items-center gap-2">
+                        <select x-model="logFilter.status" @change="fetchLogs()" class="text-xs py-1 px-2 w-24">
+                            <option value="">All Status</option>
+                            <option value="2xx">2xx</option>
+                            <option value="4xx">4xx</option>
+                            <option value="5xx">5xx</option>
+                        </select>
+                        <button @click="fetchLogs()" class="text-xs text-neon-cyan hover:underline">Refresh</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <template x-if="!logs.length">
+                        <p class="p-6 text-center text-gray-600 text-sm">No requests logged yet.</p>
+                    </template>
+                    <template x-if="logs.length">
+                        <div class="overflow-y-auto" style="max-height: calc(100vh - 12rem);">
+                            <table>
+                                <thead><tr><th>Time</th><th>Model</th><th>Account</th><th>Status</th><th>Duration</th><th>Tokens</th><th>Error</th></tr></thead>
+                                <tbody>
+                                    <template x-for="log in logs.slice().reverse()" :key="log.id">
+                                        <tr>
+                                            <td class="text-xs text-gray-500" x-text="new Date(log.timestamp).toLocaleTimeString()"></td>
+                                            <td class="text-xs" x-text="log.model"></td>
+                                            <td class="text-xs" x-text="log.account"></td>
+                                            <td>
+                                                <span class="px-1.5 py-0.5 rounded text-xs"
+                                                    :class="log.status < 300 ? 'badge-ok' : log.status < 500 ? 'badge-warn' : 'badge-error'"
+                                                    x-text="log.status"></span>
+                                            </td>
+                                            <td class="text-xs text-gray-400" x-text="log.duration + 'ms'"></td>
+                                            <td class="text-xs text-gray-500" x-text="log.outputTokens || '-'"></td>
+                                            <td class="text-xs text-red-400 max-w-xs truncate" x-text="log.error || ''"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Models View -->
+            <div x-show="view === 'models'" x-cloak>
+                <h2 class="text-xl font-bold text-white mb-6">Available Models</h2>
+                <div class="card">
+                    <table>
+                        <thead><tr><th>Model ID</th><th>Name</th><th>Family</th></tr></thead>
+                        <tbody>
+                            <template x-for="m in models" :key="m.id">
+                                <tr>
+                                    <td class="text-white font-mono text-xs" x-text="m.id"></td>
+                                    <td x-text="m.name"></td>
+                                    <td><span class="px-2 py-0.5 rounded-full text-xs badge-ok" x-text="m.family"></span></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div x-show="view === 'settings'" x-cloak>
+                <h2 class="text-xl font-bold text-white mb-6">Settings</h2>
+
+                <!-- Claude Code Config -->
+                <div class="card p-4 mb-4">
+                    <h3 class="text-sm font-semibold text-gray-400 mb-3">Claude Code Configuration</h3>
+                    <template x-if="claudeConfig">
+                        <div>
+                            <p class="text-xs text-gray-500 mb-2">
+                                Status:
+                                <span :class="claudeConfig.isConfigured ? 'text-neon-green' : 'text-orange-400'"
+                                    x-text="claudeConfig.isConfigured ? 'Configured for this proxy' : 'Not configured'"></span>
+                            </p>
+                            <p class="text-xs text-gray-500 mb-3">Path: <span class="text-gray-400" x-text="claudeConfig.path"></span></p>
+                            <div class="flex gap-2">
+                                <button @click="applyClaudeConfig()" class="btn-primary text-xs">Apply Proxy Config</button>
+                                <template x-if="claudeConfig.isConfigured">
+                                    <button @click="removeClaudeConfig()" class="btn-danger text-xs">Remove Config</button>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Strategy -->
+                <div class="card p-4 mb-4">
+                    <h3 class="text-sm font-semibold text-gray-400 mb-3">Load Balancing Strategy</h3>
+                    <template x-if="strategyInfo">
+                        <div>
+                            <select x-model="selectedStrategy" @change="changeStrategy()" class="text-sm mb-2">
+                                <template x-for="s in strategyInfo.available" :key="s.name">
+                                    <option :value="s.name" x-text="s.label" :selected="s.name === strategyInfo.current"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Server Info -->
+                <div class="card p-4">
+                    <h3 class="text-sm font-semibold text-gray-400 mb-3">Server Information</h3>
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between"><span class="text-gray-500">Port:</span><span class="text-white" x-text="status?.port || '-'"></span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Uptime:</span><span class="text-white" x-text="status?.uptimeFormatted || '-'"></span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Strategy:</span><span class="text-white" x-text="status?.strategyLabel || '-'"></span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Total Accounts:</span><span class="text-white" x-text="status?.accounts?.total || 0"></span></div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>
