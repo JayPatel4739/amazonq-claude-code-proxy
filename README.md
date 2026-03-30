@@ -2,7 +2,7 @@
 
 **Disclamer**: This whole project is vibe coded with claude code  and in that also antigravity's proxy is used, so use it accordingly (I don't know much about `js` so don't know what is written in this), it could have vulnerabilities. If you find any vulnerabilities in this you can contribute in this project and improve it. 
 
-This is project is inspired from the another project just like this, this is the project link: https://github.com/badrisnarayanan/antigravity-claude-proxy
+This is project is inspired from the another project just like this, this is the project link: [https://github.com/badrisnarayanan/antigravity-claude-proxy](https://github.com/badrisnarayanan/antigravity-claude-proxy)
 
 A proxy server that lets you use Claude models in **Claude Code CLI** by routing requests through **Amazon Q Developer's** infrastructure.
 
@@ -112,6 +112,23 @@ npm start -- --debug             # Enable verbose debug logging
 npm start -- --strategy=sticky   # Set load balancing strategy
 PORT=8080 npm start              # Custom port
 ```
+
+## Docker
+
+```bash
+# Build the image
+docker build -t amazonq-claude-proxy .
+
+# Run the container (first time)
+docker run --name amazonq-claude-proxy -p 9090:9090 \
+  -v ~/.amazonq-claude-proxy:/root/.amazonq-claude-proxy \
+  amazonq-claude-proxy
+
+# Start existing container with logs
+docker start -a amazonq-claude-proxy
+```
+
+> **Note:** The volume mount (`-v`) shares your account credentials from the host into the container. Make sure you've added at least one account before running via Docker.
 
 ## Web Dashboard
 
