@@ -311,9 +311,20 @@ app.post('/v1/messages', async (req, res) => {
                         const toolName = match[2];
                         let toolInput = {};
                         try {
-                            toolInput = JSON.parse(match[3].trim());
+                            let parsed = JSON.parse(match[3].trim());
+                            // Handle double-encoded JSON (string instead of object)
+                            while (typeof parsed === 'string') {
+                                try { parsed = JSON.parse(parsed); } catch { break; }
+                            }
+                            toolInput = typeof parsed === 'object' && parsed !== null ? parsed : { text: String(parsed) };
                         } catch {
-                            toolInput = { text: match[3].trim() };
+                            const raw = match[3].trim();
+                            try {
+                                const cleaned = raw.replace(/,\s*([}\]])/g, '$1');
+                                toolInput = JSON.parse(cleaned);
+                            } catch {
+                                toolInput = { text: raw };
+                            }
                         }
 
                         const toolStart = createContentBlockStart(blockIndex, 'tool_use', {

@@ -26,10 +26,21 @@ function parseToolUseBlocks(text) {
 
         let input = {};
         try {
-            input = JSON.parse(match[3].trim());
+            let parsed = JSON.parse(match[3].trim());
+            // Handle double-encoded JSON (string instead of object)
+            while (typeof parsed === 'string') {
+                try { parsed = JSON.parse(parsed); } catch { break; }
+            }
+            input = typeof parsed === 'object' && parsed !== null ? parsed : { text: String(parsed) };
         } catch {
-            // If JSON parsing fails, wrap in a text field
-            input = { text: match[3].trim() };
+            // If JSON parsing fails, try cleaning common issues
+            const raw = match[3].trim();
+            try {
+                const cleaned = raw.replace(/,\s*([}\]])/g, '$1');
+                input = JSON.parse(cleaned);
+            } catch {
+                input = { text: raw };
+            }
         }
 
         blocks.push({
