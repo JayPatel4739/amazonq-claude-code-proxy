@@ -155,16 +155,12 @@ app.get('/v1/models', (req, res) => {
 });
 
 /**
- * Count tokens endpoint (not implemented)
+ * Count tokens endpoint - approximation (~4 chars/token)
  */
 app.post('/v1/messages/count_tokens', (req, res) => {
-    res.status(501).json({
-        type: 'error',
-        error: {
-            type: 'not_implemented',
-            message: 'Token counting is not implemented.'
-        }
-    });
+    const text = JSON.stringify(req.body);
+    const inputTokens = Math.ceil(text.length / 4);
+    res.json({ input_tokens: inputTokens });
 });
 
 /**
